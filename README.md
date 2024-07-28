@@ -66,16 +66,20 @@ The work must return an error. This error will be checked by the `Checker`.
 ### Make Checker
 
 ```go
-package main
+package riddle
 
 import (
-    "log"
+	"context"
+	"fmt"
+	"log"
+	"github.com/snowmerak/scope"
 )
 
-func main() {
-    printChecker := func(err error) {
-        log.Println(err)
-    }
+var _ scope.Checker[State] = SimpleChecker
+
+func SimpleChecker(err error, state *State) {
+log.Printf("SimpleChecker: %v\n", err)
+state.number.Store(0)
 }
 ```
 
@@ -128,9 +132,7 @@ func main() {
 
 	r := riddle.NewState()
 
-	scope.Sequence(ctx, r, func(err error) {
-		log.Printf("sequence error: %v", err)
-	}, riddle.ResetAndPrint, riddle.AddOne, riddle.AddTwo, riddle.SubOne)
+	scope.Sequence(ctx, r, riddle.SimpleChecker, riddle.ResetAndPrint, riddle.AddOne, riddle.AddTwo, riddle.SubOne)
 }
 ```
 
@@ -161,17 +163,11 @@ func main() {
 
 	r := riddle.NewState()
 
-	scope.Sequence(ctx, r, func(err error) {
-		log.Printf("sequence error: %v", err)
-	}, riddle.JustPrint, riddle.AddOne, riddle.AddTwo, riddle.SubOne)
+	scope.Sequence(ctx, r, riddle.SimpleChecker, riddle.JustPrint, riddle.AddOne, riddle.AddTwo, riddle.SubOne)
 
-	scope.Sequence(ctx, r, func(err error) {
-		log.Printf("sequence error: %v", err)
-	}, riddle.JustPrint, riddle.AddOne, riddle.AddTwo, riddle.SubOne)
+	scope.Sequence(ctx, r, riddle.SimpleChecker, riddle.JustPrint, riddle.AddOne, riddle.AddTwo, riddle.SubOne)
 
-	scope.Sequence(ctx, r, func(err error) {
-		log.Printf("sequence error: %v", err)
-	}, riddle.JustPrint, riddle.AddOne, riddle.AddTwo, riddle.SubOne)
+	scope.Sequence(ctx, r, riddle.SimpleChecker, riddle.JustPrint, riddle.AddOne, riddle.AddTwo, riddle.SubOne)
 }
 ```
 

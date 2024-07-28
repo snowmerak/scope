@@ -56,3 +56,10 @@ var _ scope.CleanUp[State] = JustPrint
 func JustPrint(ctx context.Context, state *State) {
 	fmt.Printf("State: %d\n", state.number.Load())
 }
+
+var _ scope.Checker[State] = SimpleChecker
+
+func SimpleChecker(err error, state *State) {
+	log.Printf("SimpleChecker: %v\n", err)
+	state.number.Store(0)
+}

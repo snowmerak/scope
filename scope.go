@@ -10,12 +10,12 @@ import (
 
 type (
 	Work[T any]         func(ctx context.Context, state *T) error
-	Checker             func(error)
+	Checker[T any]      func(err error, state *T)
 	CleanUp[T any]      func(ctx context.Context, state *T)
-	Scope[T any]        func(ctx context.Context, state *T, checker Checker, cleanup CleanUp[T], works ...Work[T])
-	WithCancel[T any]   func(ctx context.Context, state *T, checker Checker, cleanup CleanUp[T], works ...Work[T])
-	WithTimeout[T any]  func(ctx context.Context, state *T, duration time.Duration, checker Checker, cleanup CleanUp[T], works ...Work[T])
-	WithDeadline[T any] func(ctx context.Context, state *T, deadline time.Time, checker Checker, cleanup CleanUp[T], works ...Work[T])
+	Scope[T any]        func(ctx context.Context, state *T, checker Checker[T], cleanup CleanUp[T], works ...Work[T])
+	WithCancel[T any]   func(ctx context.Context, state *T, checker Checker[T], cleanup CleanUp[T], works ...Work[T])
+	WithTimeout[T any]  func(ctx context.Context, state *T, duration time.Duration, checker Checker[T], cleanup CleanUp[T], works ...Work[T])
+	WithDeadline[T any] func(ctx context.Context, state *T, deadline time.Time, checker Checker[T], cleanup CleanUp[T], works ...Work[T])
 )
 
 // sequence runs the given functions in sequence.
@@ -84,9 +84,9 @@ func parallel[T any](ctx context.Context, state *T, f ...Work[T]) (success int, 
 // Sequence runs the given functions in sequence.
 // If any of the functions returns an error, the error is passed to the errChecker.
 // If cleanUp is not nil, it is called after all functions have been executed.
-func Sequence[T any](ctx context.Context, state *T, errChecker Checker, cleanUp CleanUp[T], f ...Work[T]) {
+func Sequence[T any](ctx context.Context, state *T, errChecker Checker[T], cleanUp CleanUp[T], f ...Work[T]) {
 	if err := sequence[T](ctx, state, f...); err != nil {
-		errChecker(err)
+		errChecker(err, state)
 	}
 
 	if cleanUp != nil {
@@ -99,12 +99,12 @@ var _ Scope[int] = Sequence[int]
 // SequenceWithCancel runs the given functions in sequence with a cancel function.
 // If any of the functions returns an error, the error is passed to the errChecker.
 // If cleanUp is not nil, it is called after all functions have been executed.
-func SequenceWithCancel[T any](ctx context.Context, state *T, errChecker Checker, cleanUp CleanUp[T], f ...Work[T]) {
+func SequenceWithCancel[T any](ctx context.Context, state *T, errChecker Checker[T], cleanUp CleanUp[T], f ...Work[T]) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	if err := sequence[T](ctx, state, f...); err != nil {
-		errChecker(err)
+		errChecker(err, state)
 	}
 
 	if cleanUp != nil {
@@ -117,12 +117,12 @@ var _ WithCancel[int] = SequenceWithCancel[int]
 // SequenceWithTimeout runs the given functions in sequence with a timeout.
 // If any of the functions returns an error, the error is passed to the errChecker.
 // If cleanUp is not nil, it is called after all functions have been executed.
-func SequenceWithTimeout[T any](ctx context.Context, state *T, timeout time.Duration, errChecker Checker, cleanUp CleanUp[T], f ...Work[T]) {
+func SequenceWithTimeout[T any](ctx context.Context, state *T, timeout time.Duration, errChecker Checker[T], cleanUp CleanUp[T], f ...Work[T]) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	if err := sequence[T](ctx, state, f...); err != nil {
-		errChecker(err)
+		errChecker(err, state)
 	}
 
 	if cleanUp != nil {
@@ -135,12 +135,12 @@ var _ WithTimeout[int] = SequenceWithTimeout[int]
 // SequenceWithDeadline runs the given functions in sequence with a deadline.
 // If any of the functions returns an error, the error is passed to the errChecker.
 // If cleanUp is not nil, it is called after all functions have been executed.
-func SequenceWithDeadline[T any](ctx context.Context, state *T, deadline time.Time, errChecker Checker, cleanUp CleanUp[T], f ...Work[T]) {
+func SequenceWithDeadline[T any](ctx context.Context, state *T, deadline time.Time, errChecker Checker[T], cleanUp CleanUp[T], f ...Work[T]) {
 	ctx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
 
 	if err := sequence[T](ctx, state, f...); err != nil {
-		errChecker(err)
+		errChecker(err, state)
 	}
 
 	if cleanUp != nil {
@@ -153,9 +153,9 @@ var _ WithDeadline[int] = SequenceWithDeadline[int]
 // All runs the given functions in parallel.
 // If all functions return an error, the error is passed to the errChecker.
 // If cleanUp is not nil, it is called after all functions have been executed.
-func All[T any](ctx context.Context, state *T, errChecker Checker, cleanUp CleanUp[T], f ...Work[T]) {
+func All[T any](ctx context.Context, state *T, errChecker Checker[T], cleanUp CleanUp[T], f ...Work[T]) {
 	if _, err := parallel[T](ctx, state, f...); err != nil {
-		errChecker(err)
+		errChecker(err, state)
 	}
 
 	if cleanUp != nil {
@@ -168,12 +168,12 @@ var _ Scope[int] = All[int]
 // AllWithCancel runs the given functions in parallel with a cancel function.
 // If all functions return an error, the error is passed to the errChecker.
 // If cleanUp is not nil, it is called after all functions have been executed.
-func AllWithCancel[T any](ctx context.Context, state *T, errChecker Checker, cleanUp CleanUp[T], f ...Work[T]) {
+func AllWithCancel[T any](ctx context.Context, state *T, errChecker Checker[T], cleanUp CleanUp[T], f ...Work[T]) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	if _, err := parallel[T](ctx, state, f...); err != nil {
-		errChecker(err)
+		errChecker(err, state)
 	}
 
 	if cleanUp != nil {
@@ -186,12 +186,12 @@ var _ WithCancel[int] = AllWithCancel[int]
 // AllWithTimeout runs the given functions in parallel with a timeout.
 // If all functions return an error, the error is passed to the errChecker.
 // If cleanUp is not nil, it is called after all functions have been executed.
-func AllWithTimeout[T any](ctx context.Context, state *T, timeout time.Duration, errChecker Checker, cleanUp CleanUp[T], f ...Work[T]) {
+func AllWithTimeout[T any](ctx context.Context, state *T, timeout time.Duration, errChecker Checker[T], cleanUp CleanUp[T], f ...Work[T]) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	if _, err := parallel[T](ctx, state, f...); err != nil {
-		errChecker(err)
+		errChecker(err, state)
 	}
 
 	if cleanUp != nil {
@@ -204,12 +204,12 @@ var _ WithTimeout[int] = AllWithTimeout[int]
 // AllWithDeadline runs the given functions in parallel with a deadline.
 // If all functions return an error, the error is passed to the errChecker.
 // If cleanUp is not nil, it is called after all functions have been executed.
-func AllWithDeadline[T any](ctx context.Context, state *T, deadline time.Time, errChecker Checker, cleanUp CleanUp[T], f ...Work[T]) {
+func AllWithDeadline[T any](ctx context.Context, state *T, deadline time.Time, errChecker Checker[T], cleanUp CleanUp[T], f ...Work[T]) {
 	ctx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
 
 	if _, err := parallel[T](ctx, state, f...); err != nil {
-		errChecker(err)
+		errChecker(err, state)
 	}
 
 	if cleanUp != nil {
@@ -222,10 +222,10 @@ var _ WithDeadline[int] = AllWithDeadline[int]
 // Any runs the given functions in parallel.
 // If any of the functions returns an error, the error is passed to the errChecker.
 // If cleanUp is not nil, it is called after all functions have been executed.
-func Any[T any](ctx context.Context, state *T, errChecker Checker, cleanUp CleanUp[T], f ...Work[T]) {
+func Any[T any](ctx context.Context, state *T, errChecker Checker[T], cleanUp CleanUp[T], f ...Work[T]) {
 	success, err := parallel[T](ctx, state, f...)
 	if success == 0 {
-		errChecker(err)
+		errChecker(err, state)
 	}
 
 	if cleanUp != nil {
@@ -238,13 +238,13 @@ var _ Scope[int] = Any[int]
 // AnyWithCancel runs the given functions in parallel with a cancel function.
 // If any of the functions returns an error, the error is passed to the errChecker.
 // If cleanUp is not nil, it is called after all functions have been executed.
-func AnyWithCancel[T any](ctx context.Context, state *T, errChecker Checker, cleanUp CleanUp[T], f ...Work[T]) {
+func AnyWithCancel[T any](ctx context.Context, state *T, errChecker Checker[T], cleanUp CleanUp[T], f ...Work[T]) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	success, err := parallel[T](ctx, state, f...)
 	if success == 0 {
-		errChecker(err)
+		errChecker(err, state)
 	}
 
 	if cleanUp != nil {
@@ -257,13 +257,13 @@ var _ WithCancel[int] = AnyWithCancel[int]
 // AnyWithTimeout runs the given functions in parallel with a timeout.
 // If any of the functions returns an error, the error is passed to the errChecker.
 // If cleanUp is not nil, it is called after all functions have been executed.
-func AnyWithTimeout[T any](ctx context.Context, state *T, timeout time.Duration, errChecker Checker, cleanUp CleanUp[T], f ...Work[T]) {
+func AnyWithTimeout[T any](ctx context.Context, state *T, timeout time.Duration, errChecker Checker[T], cleanUp CleanUp[T], f ...Work[T]) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	success, err := parallel[T](ctx, state, f...)
 	if success == 0 {
-		errChecker(err)
+		errChecker(err, state)
 	}
 
 	if cleanUp != nil {
@@ -276,13 +276,13 @@ var _ WithTimeout[int] = AnyWithTimeout[int]
 // AnyWithDeadline runs the given functions in parallel with a deadline.
 // If any of the functions returns an error, the error is passed to the errChecker.
 // If cleanUp is not nil, it is called after all functions have been executed.
-func AnyWithDeadline[T any](ctx context.Context, state *T, deadline time.Time, errChecker Checker, cleanUp CleanUp[T], f ...Work[T]) {
+func AnyWithDeadline[T any](ctx context.Context, state *T, deadline time.Time, errChecker Checker[T], cleanUp CleanUp[T], f ...Work[T]) {
 	ctx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
 
 	success, err := parallel[T](ctx, state, f...)
 	if success == 0 {
-		errChecker(err)
+		errChecker(err, state)
 	}
 
 	if cleanUp != nil {
